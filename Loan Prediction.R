@@ -55,7 +55,33 @@ loan_dat$Dependents[loan_dat$Dependents == ""] <- 0
 
 ##missing values for self_employed
 
+loan_dat$Self_Employed <- ifelse(loan_dat$Self_Employed == "" & loan_dat$Gender == "Female" & loan_dat$ApplicantIncome <= 8600,"No",
+                                 ifelse(loan_dat$Self_Employed == "" & loan_dat$Gender == "Female" & loan_dat$ApplicantIncome > 8600, "Yes",
+                                        ifelse(loan_dat$Self_Employed == "" & loan_dat$Gender == "Male" & loan_dat$ApplicantIncome <= 6700, "No",
+                                               ifelse(loan_dat$Self_Employed == "" & loan_dat$Gender == "Male" & loan_dat$ApplicantIncome > 6700, "Yes",
+                                                      loan_dat$Self_Employed))))
 
+##filling missing values for loan_amount
+#melten <- melt(loan_dat[,c('Gender','Education','LoanAmount')], id = c("Gender","Education") )
+#casting <- dcast(melten, Gender ~ Education, mean, na.rm = TRUE)
+#loan_dat %>% group_by(Gender, Education) %>% dplyr::summarise(mean = mean(LoanAmount, na.rm = TRUE))
+
+mean_loanamount <- ddply(na.omit(loan_dat), ~Gender + Education, summarise, mean= round(mean(LoanAmount)))
+loan_dat$LoanAmount <- ifelse(is.na(loan_dat$LoanAmount) & loan_dat$Gender == "Female" & loan_dat$Education == 'Graduate', with(mean_loanamount, mean[Gender == 'Female' & Education == "Graduate"]),
+                              ifelse(is.na(loan_dat$LoanAmount) & loan_dat$Gender == "Female" & loan_dat$Education == 'Not Graduate', with(mean_loanamount, mean[Gender == 'Female' & Education == "Not Graduate"]),
+                                     ifelse(is.na(loan_dat$LoanAmount) & loan_dat$Gender == "Male" & loan_dat$Education == 'Graduate', with(mean_loanamount, mean[Gender == 'Male' & Education == "Graduate"]),
+                                            ifelse(is.na(loan_dat$LoanAmount) & loan_dat$Gender == "Male" & loan_dat$Education == 'Not Graduate', with(mean_loanamount, mean[Gender == 'Male' & Education == "Not Graduate"]),
+                                                   loan_dat$LoanAmount))))
+##missing values for loan term
+#create new variable income by summing applicantincome and coapplicant income
+loan_dat$Income <- loan_dat$ApplicantIncome + loan_dat$CoapplicantIncome
+loan_term <- loan_dat %>% group_by(Loan_Amount_Term) %>% 
+  dplyr::summarise(Avg_LoanAmt = mean(LoanAmount), Avg_Income = mean(Income))
+ggplot(loan_term, aes(x = factor(Loan_Amount_Term), y = Avg_LoanAmt)) +
+  geom_bar(stat = 'identity') + labs(title = "Average Loan Amount by Loan term", x = "Loan Term", y = "Average Loan Amount")
+
+ggplot(loan_term, aes(x = factor(Loan_Amount_Term), y = Avg_Income)) + 
+  geom_bar(stat = 'identity') + labs(title = "Average Income by Loan term", x = "Loan Term", y = "Average Income")
 
 
 

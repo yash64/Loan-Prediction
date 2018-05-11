@@ -82,7 +82,34 @@ ggplot(loan_term, aes(x = factor(Loan_Amount_Term), y = Avg_LoanAmt)) +
 
 ggplot(loan_term, aes(x = factor(Loan_Amount_Term), y = Avg_Income)) + 
   geom_bar(stat = 'identity') + labs(title = "Average Income by Loan term", x = "Loan Term", y = "Average Income")
+#the plots are giving us a good picture as how the loan term is distributed based on income and loan amount
+#but looking at the distribution of the customers per term
+table(loan_dat$Loan_Amount_Term)
+ggplot(loan_dat, aes(factor(Loan_Amount_Term))) + geom_bar() + labs(x = "Loan Term")
+#we can fill the missing loan term as 360 as ~86% of the total data has loan term as 360.
+loan_dat$Loan_Amount_Term <- ifelse(is.na(loan_dat$Loan_Amount_Term), 360, loan_dat$Loan_Amount_Term)
 
+##Credit history missing values
+table(loan_dat$Credit_History)
+ggplot(loan_dat, aes(factor(Credit_History))) + geom_bar() + labs(x = "Credit History")
+
+#looking at the pattern of credit history with others features.
+ggplot(loan_dat, aes(x = factor(Credit_History))) + geom_bar(aes(fill = Gender), width = 0.5)
+ggplot(loan_dat, aes(x = factor(Credit_History))) + geom_bar(aes(fill = Married), width = 0.5)
+ggplot(loan_dat, aes(x = factor(Credit_History))) + geom_bar(aes(fill = Dependents), width = 0.5)
+ggplot(loan_dat, aes(x = factor(Credit_History))) + geom_bar(aes(fill = Education), width = 0.5)
+ggplot(loan_dat, aes(x = factor(Credit_History))) + geom_bar(aes(fill = Self_Employed), width = 0.5)
+
+loan_dat$Credit_History[is.na(loan_dat$Credit_History)] <- 1
+
+#we are done with imputing missing values
+
+###Exploratory data analysis###
+#as we created total income we can delete the columns app_income, coapp_income
+loan_dat$ApplicantIncome <- NULL
+loan_dat$CoapplicantIncome <- NULL
+
+ggplot(train) + geom_point(aes(Loan_Status))
 
 
 

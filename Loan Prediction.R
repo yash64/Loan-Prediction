@@ -4,15 +4,19 @@ setwd("E:/My Work/Dataset/Loan Prediction-III")
 #load required libraries
 library(dplyr)
 library(ggplot2)
+library(scales)
 library(reshape2)
 library(plyr)
 library(stringr)
 library(randomForest)
+library(caret)
+library(Deducer)
 
 #importing datasets
-train <- read.csv("train.csv", stringsAsFactors = FALSE)
-test <- read.csv("test.csv", stringsAsFactors = FALSE)
+train <- read.csv("Loan Prediction_train.csv", stringsAsFactors = FALSE)
+test <- read.csv("Loan Prediction_test.csv", stringsAsFactors = FALSE)
 prop.table(table(train$Loan_Status))
+
 
 #combine both datasets so that pre-processing is applied on both of them
 test$Loan_Status <- NaN
@@ -75,8 +79,10 @@ loan_dat$LoanAmount <- ifelse(is.na(loan_dat$LoanAmount) & loan_dat$Gender == "F
 ##missing values for loan term
 #create new variable income by summing applicantincome and coapplicant income
 loan_dat$Income <- loan_dat$ApplicantIncome + loan_dat$CoapplicantIncome
+
 loan_term <- loan_dat %>% group_by(Loan_Amount_Term) %>% 
   dplyr::summarise(Avg_LoanAmt = mean(LoanAmount), Avg_Income = mean(Income))
+
 ggplot(loan_term, aes(x = factor(Loan_Amount_Term), y = Avg_LoanAmt)) +
   geom_bar(stat = 'identity') + labs(title = "Average Loan Amount by Loan term", x = "Loan Term", y = "Average Loan Amount")
 
@@ -109,25 +115,60 @@ loan_dat$Credit_History[is.na(loan_dat$Credit_History)] <- 1
 loan_dat$ApplicantIncome <- NULL
 loan_dat$CoapplicantIncome <- NULL
 
-ggplot(train) + geom_point(aes(Loan_Status))
+ggplot(loan_dat, aes(x = Gender, y = Income)) + geom_col(width = 0.3)+ #geom_bar(stat = 'identity', width = 0.3) +
+  scale_y_continuous(labels = comma)
 
+ggplot(loan_dat, aes(x=Income, y=LoanAmount, color = factor(Credit_History))) + geom_point()
+#from above it can be seen that credit history is negative where customers income and loan amount is low
 
+ggplot(loan_dat, aes(Property_Area, fill = factor(Credit_History))) + geom_bar(width = 0.4)
+ggplot(loan_dat, aes(Property_Area, Income, color = factor(Credit_History))) + geom_point()
 
+###Model building###
+#prepare train and test datasets
+train_dat <- loan_dat[1:nrow(train),]
+test_dat <- loan_dat[-(1:nrow(train)),]
+test_dat$Loan_Status <- NULL
 
+#convert chars to factors
+col <- colnames(Filter(is.character,train_dat))
+train_dat[col] <- lapply(train_dat[col], factor)
 
+col <- colnames(Filter(is.character,test_dat))
+test_dat[col] <- lapply(test_dat[col], factor)
 
+train_dat$Credit_History <- as.factor(train_dat$Credit_History)
+test_dat$Credit_History <- as.factor(test_dat$Credit_History)
+train_dat$Loan_Amount_Term <- as.factor(train_dat$Loan_Amount_Term)
+test_dat$Loan_Amount_Term <- as.factor(test_dat$Loan_Amount_Term)
 
+#Logistic Regression
+train_dat$Loan_ID <- NULL
+lr_model <- glm(data = train_dat, Loan_Status ~ ., family = "binomial")
+summary(lr_model)
 
+lr_prob <- predict(lr_model, newdata = train_dat, type = 'response')
+lr_pred <- ifelse(lr_prob >0.5, 'Y', 'N')
+lr_pred <- as.factor(lr_pred)
+confusionMatrix(lr_pred, train_dat$Loan_Status) #accuracy 0.8143
+rocplot(lr_model) #auc = 0.8058
 
+test_dat$Loan_ID <- NULL
+#we have new levels in Loan_amount_term of test data which were not available in train data
+#so we get error as these levels were not part of our training model
+#converting these new levels to already existing levels
+test_dat$Loan_Amount_Term[test_dat$Loan_Amount_Term == 350] <- 360
+test_dat$Loan_Amount_Term[test_dat$Loan_Amount_Term == 6] <- 12
+lr_prob_test <- predict(lr_model, newdata = test_dat, type = 'response')
 
+#Random forest model
+rf_model <- randomForest(Loan_Status ~., data = train_dat, ntree = 750)
+print(rf_model)
+varImpPlot(rf_model)
 
-
-
-
-
-
-
-
-
+test_dat$Loan_ID <- test$Loan_ID
+test_dat$Loan_Status <- ifelse(lr_prob_test>0.5, "Y","N")
+result <- test_dat[, c("Loan_ID","Loan_Status")]
+write.csv(result,"result.csv", row.names = F)
 
 
